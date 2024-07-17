@@ -121,3 +121,11 @@ const dispatch = useDispatch();
     </div>
 </div>
 ```
+
+8. Thunks
+
+### En este ejemplo se crea un thunk para obtener los pokemones 
+
+#### Ojo: Los thunks se utilizan para las acciones asincronas
+
+```javascript
