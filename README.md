@@ -106,26 +106,154 @@ const dispatch = useDispatch();
 #### Ojo: Las actions se tienen que mandar a ejecutar "NO" solo referenciarlas
 
 ```javascript
- <div>
-    <a href="https://react.dev" target="_blank">
-        <img src={reactLogo} className="logo react" alt="React logo" />
-    </a>
-        <h1>Vite + React</h1>
-    <div className="card">
-        <h2>count is {counter}</h2>
-        <div style={{ display: "flex", flexFlow: "column", gap: "4px" }}>
-            <button onClick={() => dispatch(increment())}>Increment</button>
-            <button onClick={() => dispatch(decrement())}>Decrement</button>
-            <button onClick={() => dispatch(incrementBy(2))}>Increment By 2</button>
-        </div>
+<div>
+  <a href="https://react.dev" target="_blank">
+    <img src={reactLogo} className="logo react" alt="React logo" />
+  </a>
+  <h1>Vite + React</h1>
+  <div className="card">
+    <h2>count is {counter}</h2>
+    <div style={{ display: "flex", flexFlow: "column", gap: "4px" }}>
+      <button onClick={() => dispatch(increment())}>Increment</button>
+      <button onClick={() => dispatch(decrement())}>Decrement</button>
+      <button onClick={() => dispatch(incrementBy(2))}>Increment By 2</button>
     </div>
+  </div>
 </div>
 ```
 
 8. Thunks
 
-### En este ejemplo se crea un thunk para obtener los pokemones 
+### En este ejemplo se crea un thunk para obtener los pokemones
 
 #### Ojo: Los thunks se utilizan para las acciones asincronas
 
 ```javascript
+import { pokemonApi } from "../../../api/pokemonApi";
+import { setPokemons, startLoadingPokemons } from "./pokemonSlice";
+
+//! Los thunks son para partes asíncronas de la aplicación
+// Este thunk es para obtener los pokemones de un api
+export const getPokemons = (page = 0) => {
+  return async (dispatch, getState) => {
+    // Se dispara la acción de loading
+    dispatch(startLoadingPokemons());
+    // Se obtienen los pokemones
+    const { data } = await pokemonApi.get(
+      `pokemon?limit=10&offset=${page * 10}`
+    );
+    // Se dispara la acción de setPokemons
+    dispatch(setPokemons({ pokemons: data.results, page: page + 1 }));
+  };
+};
+```
+
+9. Consumir el thunk en un componente
+
+### En este ejemplo se consume el thunk en el componente PokemonList
+
+#### Ojo: Se debe importar el thunk getPokemons
+
+```javascript
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { getPokemons } from "./store/slices/pokemon";
+
+export const PokemonApp = () => {
+  //Se obtienen los datos del store
+  //! Para acceder a esto se tiene que especificar el state.pokemons porque así se llama en el archivo de store.js
+  const { page, pokemons, isLoading } = useSelector((state) => state.pokemons);
+  // Se instancia un dispatch para poder llamar a las acciones
+  const dispatch = useDispatch();
+  useEffect(() => {
+    // Aquí se podría mandar la página pero por defecto se pone 0
+    dispatch(getPokemons());
+  }, []);
+  return (
+    <>
+      <h1>Pokemon app</h1>
+      <hr />
+      <div>
+        <p>Cargando... </p>
+        {isLoading ? "True" : "False"}
+      </div>
+      <ul>
+        {pokemons?.map((pokemon) => (
+          <li key={pokemon.name}>{pokemon.name}</li>
+        ))}
+      </ul>
+
+      <button onClick={() => dispatch(getPokemons(page))} disabled={isLoading}>
+        Next
+      </button>
+    </>
+  );
+};
+```
+
+10. RTK Query
+
+### En este ejemplo se crea un archivo de configuración para el RTK Query
+
+En sí, RTQ Query es una herramienta que permite hacer peticiones a un API de manera sencilla y rápida, sin embargo, requiere una buena configuración para que funcione correctamente.
+
+Destaca principalmente en el manejo de peticiones en caché.
+
+```javascript
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+
+export const todosApi = createApi({
+  reducerPath: "todos",
+  baseQuery: fetchBaseQuery({
+    baseUrl: "https://jsonplaceholder.typicode.com",
+  }),
+  endpoints: (builder) => ({
+    // Definiendo un custom hook para pedir todos los todos
+    getTodos: builder.query({
+      query: () => "/todos",
+    }),
+    // Definiendo un custom hook para pedir un solo todo (Por ID)
+    getTodo: builder.query({
+      query: (todoId) => `/todos/${todoId}`,
+    }),
+  }),
+});
+
+// Exportando hooks para usarlos en la aplicación
+export const { useGetTodosQuery, useGetTodoQuery } = todosApi;
+```
+
+11. Consumir RTK Query en un componente
+
+### En este ejemplo se consume RTK Query en el componente Todos
+
+#### Ojo: Primeramente se debe incluir dentro de los store
+
+```javascript
+import { configureStore } from "@reduxjs/toolkit";
+import { counterSlice } from "./slices/counter";
+import { pokemonSlice } from "./slices/pokemon";
+import { todosApi } from "./apis";
+export const store = configureStore({
+  reducer: {
+    counter: counterSlice.reducer,
+    pokemons: pokemonSlice.reducer,
+
+    [todosApi.reducerPath]: todosApi.reducer,
+  },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(todosApi.middleware),
+});
+```
+
+### Ojo: Luego se puede consumir en el componente
+
+```javascript
+// Importando los custom hooks
+import { useGetTodoQuery, useGetTodosQuery } from "./store/apis";
+
+// Consumiendo el custom hook para obtener todos los todos
+const { data, isLoading } = useGetTodosQuery();
+// Consumiento el custom hook para obtener un dato específico
+const { data, isLoading } = useGetTodoQuery(todoId);
+```
